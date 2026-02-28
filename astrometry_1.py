@@ -153,7 +153,7 @@ zenith_icrs = zenith_altaz.icrs
 # 4. Print how many stars you got.
 #
 radius_deg = 60.0   # start smaller than 90
-Gmax = 2       # start bright
+Gmax = 2.5      # start bright
 
 # # Protect yourself with a row limit
 Gaia.ROW_LIMIT = 200000

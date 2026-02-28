@@ -81,11 +81,12 @@ std_val = np.std(img_ravel)
 # plt.title("Histogram of pixel values")
 #plt.show()
 # Commented out plotting calls
-# plt.figure()
-# plt.hist(img_ravel, bins=100)
-# plt.xlabel("Pixel value")
-# plt.ylabel("Count")
-# plt.title("Histogram of pixel values")
+plt.figure()
+plt.hist(img_ravel, bins=1000)
+plt.xlabel("Pixel value")
+plt.ylabel("Count")
+plt.title("Histogram of pixel values")
+plt.show()
 
 
 # ---------------------------------------------------------------------
