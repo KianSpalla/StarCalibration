@@ -25,7 +25,7 @@ from GONet_Wizard.GONet_utils import GONetFile
 from pathlib import Path
 
 # Load a GONet TIFF image file
-image = Path(r"Testing Images/256_251029_204008_1761770474.jpg")
+image = Path(r"Testing Images\202_250628_063009_1751092241.jpg")
 go = GONetFile.from_file(image)  # Load the file into a GONet object
 go.remove_overscan()  # Remove the overscan region (non-imaging pixels)
 img = go.green  # Extract the green channel as a 2D NumPy array
@@ -35,21 +35,19 @@ meta = go.meta
 # Enable interactive plotting mode (plots update without blocking code execution)
 #plt.ion()
 
-# Define a sub-region (cutout) of the image to analyze
-y0, y1 = 500, 700    # Row range (vertical slice)
-x0, x1 = 500, 700    # Column range (horizontal slice)
-sub = img[y0:y1, x0:x1]  # Extract the sub-image using array slicing
+# Analyze the full image instead of a cutout
+sub = img
 
 # Calculate statistics for the sub-image
 sub_mean = sub.mean()  # Mean pixel value (background level)
 sub_std = sub.std()    # Standard deviation (noise level)
 
 # Create a threshold to identify bright pixels (stars)
-N = 5  # Threshold multiplier (higher = only brightest pixels)
+N = 2  # Threshold multiplier (higher = only brightest pixels)
 threshold = sub_mean + N * sub_std  # Threshold = mean + N * std deviation
 mask = sub > threshold  # Boolean array: True for pixels brighter than threshold
 # Notes:
-# - Slicing uses half-open intervals: rows in [y0, y1), cols in [x0, x1).
+# - Full-frame mode: `sub` is the complete image.
 # - Mean/std summarize the background and noise; threshold selects bright pixels.
 # - `mask` marks candidate star pixels (True) based on the brightness rule.
 # Define the 4 neighboring directions (up, down, left, right)
@@ -496,20 +494,20 @@ for source in sources:
     x_cen_list.append(source.get("x_centroid"))
     y_cen_list.append(source.get("y_centroid"))
 
-# # plt.figure()
-# # plt.imshow(sub, origin="lower")
+plt.figure()
+plt.imshow(sub, origin="lower")
 
-# # plt.scatter(x_peak_list, y_peak_list,
-# #             s=30, edgecolors="cyan", facecolors="none",
-# #             label="Peak")
+plt.scatter(x_peak_list, y_peak_list,
+            s=30, edgecolors="cyan", facecolors="none",
+            label="Peak")
 
-# # plt.scatter(x_cen_list, y_cen_list,
-# #             s=50, edgecolors="red", facecolors="none",
-# #             label="Centroid")
-# # plt.legend()
-# # plt.title("Peak vs centroid positions")
-# # plt.colorbar()
-# # plt.show()
+plt.scatter(x_cen_list, y_cen_list,
+            s=50, edgecolors="red", facecolors="none",
+            label="Centroid")
+plt.legend()
+plt.title("Peak vs centroid positions")
+plt.colorbar()
+plt.show()
 
 
 # ---------------------------------------------------------------------

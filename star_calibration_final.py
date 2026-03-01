@@ -181,6 +181,25 @@ def r_from_theta(theta_rad, R_pix):
     return (theta_rad / (np.pi / 2)) * R_pix
 
 
+def filter_image_sources_by_radius(img_xy, cx, cy, R_pix, radius_deg):
+    """
+    Keep only image detections inside the same angular cap used for catalog query.
+
+    radius_deg is measured from zenith. In this lens model:
+      theta=90 deg (horizon) -> r=R_pix
+      theta=radius_deg      -> r=(radius_deg/90)*R_pix
+    """
+    if len(img_xy) == 0:
+        return img_xy
+
+    max_r_pix = (float(radius_deg) / 90.0) * float(R_pix)
+    dx = img_xy[:, 0] - float(cx)
+    dy = img_xy[:, 1] - float(cy)
+    rr = np.sqrt(dx * dx + dy * dy)
+    keep = rr <= max_r_pix
+    return img_xy[keep]
+
+
 # ----------------------------
 # 3) Forward model: catalog Alt/Az -> predicted pixels
 # ----------------------------
@@ -284,7 +303,16 @@ def solve_orientation(img_xy, cat_alt_deg, cat_az_deg, cx, cy, R_pix):
     return best
 
 
-def fit_wcs_and_center_zenith(sub, img_xy, cat_alt_deg, cat_az_deg, best, meta, tol_pix=25.0):
+def fit_wcs_and_center_zenith(
+    sub,
+    img_xy,
+    cat_alt_deg,
+    cat_az_deg,
+    best,
+    meta,
+    tol_pix=25.0,
+    min_wcs_matches=3,
+):
     """
     Fit a WCS from matched star pairs, compute the zenith pixel location,
     then shift the image so zenith lands at the image center.
@@ -318,6 +346,27 @@ def fit_wcs_and_center_zenith(sub, img_xy, cat_alt_deg, cat_az_deg, best, meta, 
         kept_match_positions.append(match_position)
 
     # Final matched pixel points used for fitting.
+    min_wcs_matches = max(3, int(min_wcs_matches))
+    if len(kept_match_positions) < min_wcs_matches:
+        target_center_x = (sub.shape[1] - 1) / 2.0
+        target_center_y = (sub.shape[0] - 1) / 2.0
+        return {
+            "wcs": None,
+            "zenith_x": np.nan,
+            "zenith_y": np.nan,
+            "target_cx": float(target_center_x),
+            "target_cy": float(target_center_y),
+            "shift_x": 0.0,
+            "shift_y": 0.0,
+            "centered_sub": sub.astype(float).copy(),
+            "n_wcs_matches": int(len(kept_match_positions)),
+            "wcs_fit_success": False,
+            "wcs_fit_error": (
+                f"Not enough unique image matches after deduplication for WCS fit "
+                f"({len(kept_match_positions)} < {min_wcs_matches})."
+            ),
+        }
+
     kept_match_positions = np.array(kept_match_positions, dtype=int)
     matched_catalog_indices = matched_catalog_indices[kept_match_positions]
     matched_image_indices = matched_image_indices[kept_match_positions]
@@ -345,13 +394,6 @@ def fit_wcs_and_center_zenith(sub, img_xy, cat_alt_deg, cat_az_deg, best, meta, 
     )
     matched_icrs_coordinates = matched_altitude_azimuth_coordinates.icrs
 
-    # Fit a TAN-projection WCS using matched (x, y) pixels and sky coordinates.
-    fitted_world_coordinate_system = fit_wcs_from_points(
-        (matched_pixel_x, matched_pixel_y),
-        matched_icrs_coordinates,
-        projection="TAN",
-    )
-
     # Compute where zenith falls in pixel coordinates according to this WCS.
     zenith_altitude_azimuth_coordinate = SkyCoord(
         alt=90.0 * u.deg,
@@ -359,6 +401,46 @@ def fit_wcs_and_center_zenith(sub, img_xy, cat_alt_deg, cat_az_deg, best, meta, 
         frame=AltAz(obstime=observation_time, location=observer_location),
     )
     zenith_icrs_coordinate = zenith_altitude_azimuth_coordinate.icrs
+
+    # Fit a TAN-projection WCS; try multiple projection centers to avoid
+    # occasional optimizer bound failures on some images.
+    projection_center_candidates = [
+        "center",
+        zenith_icrs_coordinate,
+        matched_icrs_coordinates[0],
+        matched_icrs_coordinates[len(matched_icrs_coordinates) // 2],
+    ]
+    fitted_world_coordinate_system = None
+    last_wcs_error = None
+    for projection_center in projection_center_candidates:
+        try:
+            fitted_world_coordinate_system = fit_wcs_from_points(
+                (matched_pixel_x, matched_pixel_y),
+                matched_icrs_coordinates,
+                projection="TAN",
+                proj_point=projection_center,
+            )
+            break
+        except Exception as fit_error:
+            last_wcs_error = fit_error
+
+    if fitted_world_coordinate_system is None:
+        target_center_x = (sub.shape[1] - 1) / 2.0
+        target_center_y = (sub.shape[0] - 1) / 2.0
+        return {
+            "wcs": None,
+            "zenith_x": np.nan,
+            "zenith_y": np.nan,
+            "target_cx": float(target_center_x),
+            "target_cy": float(target_center_y),
+            "shift_x": 0.0,
+            "shift_y": 0.0,
+            "centered_sub": sub.astype(float).copy(),
+            "n_wcs_matches": int(len(kept_match_positions)),
+            "wcs_fit_success": False,
+            "wcs_fit_error": str(last_wcs_error),
+        }
+
     zenith_pixel_x, zenith_pixel_y = zenith_icrs_coordinate.to_pixel(fitted_world_coordinate_system, origin=0)
 
     # Desired image center target for zenith after correction.
@@ -388,13 +470,15 @@ def fit_wcs_and_center_zenith(sub, img_xy, cat_alt_deg, cat_az_deg, best, meta, 
         "shift_y": float(shift_y_pixels),
         "centered_sub": centered_sub,
         "n_wcs_matches": int(len(kept_match_positions)),
+        "wcs_fit_success": True,
+        "wcs_fit_error": "",
     }
 
 
 def main():
     image_path = Path(r"Testing Images\256_251029_204008_1761770474.jpg")
     go = GONetFile.from_file(image_path)
-    go.remove_overscan()
+    #go.remove_overscan()
 
     N = 5
     go_ravel = np.ravel(go.green)
@@ -408,17 +492,28 @@ def main():
     sources, x_centroids, y_centroids = measure_sources(sub, labels, num_labels)
     img_xy = np.column_stack([x_centroids, y_centroids])
 
+    cx, cy = 1030, 760
+    R_pix = 740
+    catalog_radius_deg = 60.0
+    img_xy = filter_image_sources_by_radius(
+        img_xy=img_xy,
+        cx=cx,
+        cy=cy,
+        R_pix=R_pix,
+        radius_deg=catalog_radius_deg,
+    )
+    if len(img_xy) == 0:
+        raise RuntimeError("No image centroids left after sky-radius filtering.")
+
     cat_alt_deg, cat_az_deg, _ = query_catalog_altaz_from_meta(
         go.meta,
-        radius_deg=60.0,
+        radius_deg=catalog_radius_deg,
         gmax=2.5,
         top_m=None,
     )
     if len(cat_alt_deg) == 0:
         raise RuntimeError("No catalog stars available after filtering above horizon.")
 
-    cx, cy = 1030, 760
-    R_pix = 740
     best = solve_orientation(img_xy, cat_alt_deg, cat_az_deg, cx, cy, R_pix)
     wcs_result = fit_wcs_and_center_zenith(
         sub=sub,
@@ -440,23 +535,28 @@ def main():
         )
     )
     print(f"WCS stars used={wcs_result['n_wcs_matches']}")
-    print(f"Zenith pixel from WCS: x={wcs_result['zenith_x']:.2f}, y={wcs_result['zenith_y']:.2f}")
-    print(f"Applied shift to center zenith: dx={wcs_result['shift_x']:.2f}, dy={wcs_result['shift_y']:.2f}")
+    if wcs_result["wcs_fit_success"]:
+        print(f"Zenith pixel from WCS: x={wcs_result['zenith_x']:.2f}, y={wcs_result['zenith_y']:.2f}")
+        print(f"Applied shift to center zenith: dx={wcs_result['shift_x']:.2f}, dy={wcs_result['shift_y']:.2f}")
+    else:
+        print("WCS fit failed for this image; skipping zenith-centering shift.")
+        print(f"WCS fit error: {wcs_result['wcs_fit_error']}")
 
     plt.figure()
     plt.imshow(sub, origin="lower", cmap="gray", vmin=sub_mean - 2 * sub_std, vmax=sub_mean + 5 * sub_std)
     plt.scatter(img_xy[:, 0], img_xy[:, 1], s=50, edgecolor="red", facecolor="none", label="Image sources")
     plt.scatter(best["pred_xy"][:, 0], best["pred_xy"][:, 1], s=50, edgecolor="blue", facecolor="none", label="Predicted sources")
-    plt.scatter([wcs_result["zenith_x"]], [wcs_result["zenith_y"]], s=120, marker="x", c="cyan", label="Zenith original (WCS)")
     plt.scatter([wcs_result["target_cx"]], [wcs_result["target_cy"]], s=100, marker="+", c="yellow", label="Target center")
-    plt.plot(
-        [wcs_result["zenith_x"], wcs_result["target_cx"]],
-        [wcs_result["zenith_y"], wcs_result["target_cy"]],
-        color="cyan",
-        linestyle="--",
-        linewidth=1.5,
-        label="Applied shift",
-    )
+    if wcs_result["wcs_fit_success"]:
+        plt.scatter([wcs_result["zenith_x"]], [wcs_result["zenith_y"]], s=120, marker="x", c="cyan", label="Zenith original (WCS)")
+        plt.plot(
+            [wcs_result["zenith_x"], wcs_result["target_cx"]],
+            [wcs_result["zenith_y"], wcs_result["target_cy"]],
+            color="cyan",
+            linestyle="--",
+            linewidth=1.5,
+            label="Applied shift",
+        )
     plt.legend()
     plt.title(f"Best score: {best['score']} matches")
     plt.show()
