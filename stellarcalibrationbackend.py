@@ -256,7 +256,7 @@ def run_calibration(image_path, show_plots=False, N=5, gmax=2.5):
     shifted = shift_image(image_path, wcs_result["shift_x"], wcs_result["shift_y"])
     return dict(best=best, wcs_result=wcs_result,
                 matched_stars=matched_stars, sub=sub, img_xy=img_xy,
-                **shifted)
+                meta=meta, **shifted)
 
 
 # ── Diagnostic plots (CLI use) ───────────────────────────────────────────────

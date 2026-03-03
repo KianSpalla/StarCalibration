@@ -269,6 +269,13 @@ class StarCalibrationApp:
             command=self._open_matched_stars,
         ).pack(side="left")
 
+        HoverButton(
+            btn_row, bg_normal=SURFACE, bg_hover=BORDER,
+            text="🗺  Star Map",
+            font=FONT_SB, padx=16, pady=7,
+            command=self._open_star_map,
+        ).pack(side="left", padx=(8, 0))
+
         self.save_btn = HoverButton(
             btn_row,
             bg_normal=SURFACE, bg_hover=BORDER,
@@ -560,6 +567,111 @@ class StarCalibrationApp:
             text="Close", font=FONT_SB, padx=16, pady=6,
             command=win.destroy,
         ).pack(pady=(0, 12))
+
+    def _open_star_map(self):
+        if self._result is None:
+            return
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
+        import astropy.units as u
+        from astropy.time import Time
+        from astropy.coordinates import EarthLocation, AltAz, SkyCoord
+
+        # ── Bright-star name catalog (ra_deg, dec_deg, name) ──────────────
+        BRIGHT_STARS = [
+            (101.287, -16.716, "Sirius"),       (95.988,  -52.696, "Canopus"),
+            (213.915,  19.182, "Arcturus"),      (279.235,  38.784, "Vega"),
+            (79.172,  45.998,  "Capella"),       (78.634,  -8.202,  "Rigel"),
+            (114.826,  5.225,  "Procyon"),       (24.429, -57.237,  "Achernar"),
+            (88.793,   7.407,  "Betelgeuse"),    (210.956, -60.373, "Hadar"),
+            (297.696,   8.868, "Altair"),        (186.650, -63.099, "Acrux"),
+            (68.980,   16.509, "Aldebaran"),     (247.352, -26.432, "Antares"),
+            (201.298,  -11.161,"Spica"),         (116.329,  28.026, "Pollux"),
+            (344.413,  -29.622,"Fomalhaut"),     (310.358,  45.280, "Deneb"),
+            (191.930,  -59.689,"Mimosa"),        (152.093,  11.967, "Regulus"),
+            (104.656,  -28.972,"Adhara"),        (113.649,  31.888, "Castor"),
+            (263.402,  -37.104,"Shaula"),        (187.791, -57.113, "Gacrux"),
+            (84.053,   21.143, "Elnath"),        (81.573,   6.350,  "Alnilam"),
+            (165.932,  61.751, "Alioth"),        (193.507,  55.960, "Dubhe"),
+            (206.885,  49.313, "Alkaid"),        (177.265,  14.572, "Denebola"),
+            (55.730,   47.788, "Mirfak"),        (10.897,   56.537, "Schedar"),
+            (37.955,   89.264, "Polaris"),       (45.570,   4.090,  "Menkar"),
+            (346.190,  15.205, "Enif"),          (322.165,  46.741, "Sador"),
+            (138.300,  -69.717,"Avior"),         (125.628, -59.510, "Naos"),
+            (239.713,  26.714, "Izar"),
+        ]
+        # Build SkyCoord array for fast batch separation
+        _cat_ra  = np.array([s[0] for s in BRIGHT_STARS])
+        _cat_dec = np.array([s[1] for s in BRIGHT_STARS])
+        _cat_sc  = SkyCoord(ra=_cat_ra * u.deg, dec=_cat_dec * u.deg, frame="icrs")
+
+        def _star_name(alt_deg, az_deg, meta, tol_deg=1.5):
+            loc   = EarthLocation(
+                lat=float(meta["GPS"]["latitude"]) * u.deg,
+                lon=float(meta["GPS"]["longitude"]) * u.deg,
+                height=float(meta["GPS"]["altitude"]) * u.m,
+            )
+            t     = Time(meta["DateTime"].replace(":", "-", 2).replace(" ", "T"), scale="utc")
+            frame = AltAz(obstime=t, location=loc)
+            sc    = SkyCoord(alt=alt_deg * u.deg, az=az_deg * u.deg, frame=frame).icrs
+            seps  = sc.separation(_cat_sc).deg
+            best  = int(np.argmin(seps))
+            return BRIGHT_STARS[best][2] if seps[best] < tol_deg else None
+
+        # ── Plot ──────────────────────────────────────────────────────────
+        result     = self._result
+        stars      = result.get("matched_stars", [])
+        img_xy     = result["img_xy"]
+        wcs_result = result["wcs_result"]
+        meta       = result.get("meta")
+        dx         = wcs_result["shift_x"]
+        dy         = wcs_result["shift_y"]
+        img        = wcs_result["centered_sub"]
+
+        fig, ax = plt.subplots(figsize=(10, 7))
+        fig.patch.set_facecolor("#0d1117")
+        ax.set_facecolor("#0d1117")
+
+        m, s = img.mean(), img.std()
+        ax.imshow(img, origin="upper", cmap="gray",
+                  vmin=m - 2 * s, vmax=m + 6 * s)
+
+        # All detected sources
+        sx = img_xy[:, 0] + dx
+        sy = img_xy[:, 1] + dy
+        ax.scatter(sx, sy, s=30, edgecolors="#f85149", facecolors="none",
+                   linewidths=0.8, label=f"All sources ({len(img_xy)})")
+
+        # Matched stars with name labels
+        for star in sorted(stars, key=lambda x: x["gmag"]):
+            mx = star["img_x"] + dx
+            my = star["img_y"] + dy
+            ax.scatter(mx, my, s=120, edgecolors="#58a6ff", facecolors="none",
+                       linewidths=1.5)
+            name = _star_name(star["alt"], star["az"], meta) if meta else None
+            label = name if name else f"G{star['gmag']:.1f}"
+            ax.annotate(
+                label,
+                xy=(mx, my), xytext=(6, -10),
+                textcoords="offset points",
+                color="#79b8ff", fontsize=7,
+                fontfamily="monospace",
+            )
+
+        matched_patch = mpatches.Circle((0, 0), radius=1, edgecolor="#58a6ff",
+                                        facecolor="none", linewidth=1.5,
+                                        label=f"Matched ({len(stars)})")
+        ax.legend(handles=[ax.get_legend_handles_labels()[0][0], matched_patch],
+                  facecolor="#161b22", edgecolor="#30363d", labelcolor="#e6edf3",
+                  fontsize=8)
+        ax.set_title(f"Star Map — {len(stars)} matched  |  rms = {result['best']['rms_pix']:.2f} px",
+                     color="#e6edf3", fontsize=11)
+        ax.tick_params(colors="#8b949e")
+        for spine in ax.spines.values():
+            spine.set_edgecolor("#30363d")
+        plt.tight_layout()
+        plt.show(block=False)
 
     def _save_shifted_image(self):
         if self._result is None:
