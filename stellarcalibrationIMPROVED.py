@@ -592,3 +592,11 @@ def run_calibration(image_path, show_plots=False, N = 5, gmax = 2.5):
         "shifted_format": shifted_result["shifted_format"],
         "suggested_suffix": shifted_result["suggested_suffix"],
     }
+
+if __name__ == "__main__":
+    run_calibration(
+        r"Testing Images\256_251029_204008_1761770474.jpg",
+        show_plots=True,
+        N=5,
+        gmax=2.5,
+    )
