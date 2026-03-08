@@ -412,14 +412,14 @@ class StarCalibrationApp:
         import matplotlib.pyplot as plt
         best          = result["best"]
         center_result = result["center_result"]
-        sub           = result["sub"]
+        img           = result["img"]
         img_xy        = result["img_xy"]
-        sub_mean      = float(np.mean(sub))
-        sub_std       = float(np.std(sub))
+        img_mean      = float(np.mean(img))
+        img_std       = float(np.std(img))
 
         plt.figure()
-        plt.imshow(sub, origin="lower", cmap="gray",
-                   vmin=sub_mean - 2 * sub_std, vmax=sub_mean + 5 * sub_std)
+        plt.imshow(img, origin="upper", cmap="gray",
+                   vmin=img_mean - 2 * img_std, vmax=img_mean + 5 * img_std)
         plt.scatter(img_xy[:, 0], img_xy[:, 1],
                     s=50, edgecolor="red", facecolor="none", label="Image sources")
         plt.scatter(best["pred_xy"][:, 0], best["pred_xy"][:, 1],
@@ -438,8 +438,8 @@ class StarCalibrationApp:
         plt.show(block=False)
 
         plt.figure()
-        plt.imshow(center_result["centered_sub"], origin="lower", cmap="gray",
-                   vmin=sub_mean - 2 * sub_std, vmax=sub_mean + 5 * sub_std)
+        plt.imshow(center_result["centered_sub"], origin="upper", cmap="gray",
+                   vmin=img_mean - 2 * img_std, vmax=img_mean + 5 * img_std)
         plt.scatter([center_result["target_cx"]], [center_result["target_cy"]],
                     s=120, marker="x", c="cyan", label="Centered zenith target")
         plt.legend()

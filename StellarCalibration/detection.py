@@ -10,13 +10,13 @@ def compact_search(mask):
     labels, num_clusters = nd_label(mask)
     return labels, num_clusters
 
-def measure_sources(sub, labels, num_clusters):
+def measure_sources(img, labels, num_clusters):
     if num_clusters == 0:
         return [], [], []
 
     label_ids = np.arange(1, num_clusters + 1)
-    total_fluxes = ndimage_sum(sub, labels, index=label_ids)
-    centers = ndimage_com(sub, labels, index=label_ids)
+    total_fluxes = ndimage_sum(img, labels, index=label_ids)
+    centers = ndimage_com(img, labels, index=label_ids)
 
     sources = []
     x_centroids = []
