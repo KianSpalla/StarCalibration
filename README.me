@@ -1,7 +1,7 @@
 Star Calibration
 ================
 
-This project calibrates uncalibrated GONet all-sky images by matching detected stars in an image to Gaia catalog stars, solving camera orientation, fitting WCS, and shifting the image so the zenith is centered.
+This project calibrates uncalibrated GONet all-sky images by matching detected stars in an image to Gaia catalog stars, solving camera orientation, and shifting the image so the zenith is centered.
 
 
 What this tool does
@@ -10,8 +10,7 @@ What this tool does
 1. Detects bright star sources in the image.
 2. Queries Gaia for bright stars visible at the capture location/time.
 3. Solves camera orientation by maximizing star matches.
-4. Fits a WCS from matched stars.
-5. Shifts the original image so zenith is centered.
+4. Shifts the original image so zenith is centered.
 
 Requirements
 ------------
@@ -25,7 +24,7 @@ Install dependencies:
 
 `pip install numpy scipy astropy astroquery pillow matplotlib`
 
-You might also need to set up enviornmental variables on your machine, or run it on a VM.
+You also need to set up enviornmental variables on your machine, or run it on a VM. For GONet_Wizard to work.
 Instructions for this are at:
 https://gterreran.github.io/GONet_Wizard/installation.html
 
@@ -33,7 +32,7 @@ https://gterreran.github.io/GONet_Wizard/installation.html
 Run the GUI
 -----------
 
-From the project root:
+From the StellarCalibration folder:
 
 `python stellarcalibration.py`
 
