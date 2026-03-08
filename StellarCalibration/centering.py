@@ -5,10 +5,6 @@ from geometry import predict_pixels_from_catalog
 
 
 def find_zenith_pixel_and_center(sub, best, cx, cy, R_pix):
-    """
-    Projects the zenith (alt=90°, any az) through the fisheye model to find
-    its pixel location, then shifts the image so the zenith lands at centre.
-    """
     zenith_pred = predict_pixels_from_catalog(
         np.array([90.0]), np.array([0.0]),
         cx, cy, R_pix,

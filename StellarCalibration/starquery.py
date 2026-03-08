@@ -5,9 +5,6 @@ from astropy.coordinates import EarthLocation, AltAz, SkyCoord
 from astroquery.gaia import Gaia
 
 def query_catalog_altaz_from_meta(meta, radius_deg=60.0, gmax=2.5, top_m=None):
-    """
-    Same core behavior as old version; comments reduced to implementation deltas only.
-    """
     lat_deg = float(meta["GPS"]["latitude"])
     lon_deg = float(meta["GPS"]["longitude"])
     alt_m = float(meta["GPS"]["altitude"])

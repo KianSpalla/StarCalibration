@@ -4,23 +4,12 @@ from geometry import predict_pixels_from_catalog
 
 
 def match_score(img_tree, pred_xy, tol_pix=20.0):
-    """
-    Improvement vs old version:
-    - Old function built cKDTree on every call.
-    - New function receives a prebuilt tree, removing thousands of rebuilds
-      during grid search.
-    """
     dists, idx = img_tree.query(pred_xy, k=1)
     score = np.sum(dists <= tol_pix)
     return int(score), dists, idx
 
 
 def solve_orientation(img_xy, cat_alt_deg, cat_az_deg, cx, cy, R_pix):
-    """
-    Improvement vs old version:
-    - Builds cKDTree once and reuses it via match_score(img_tree, ...).
-    - Keeps same coarse+refine search behavior and output fields.
-    """
     img_tree = cKDTree(img_xy)
 
     alpha_grid = np.deg2rad(np.arange(0, 360, 5))
