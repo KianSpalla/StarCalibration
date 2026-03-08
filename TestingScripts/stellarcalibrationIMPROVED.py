@@ -1,12 +1,4 @@
-"""
-star_calibration_backend.py
-
-Comment style in this file is intentionally change-focused.
-Compared with stellarcalibrationOLDVERSION.py, this version keeps the same
-pipeline but documents only concrete improvements and behavior differences.
-"""
-
-import numpy as np
+﻿import numpy as np
 from scipy.spatial import cKDTree
 from scipy.ndimage import (
     label as nd_label,
