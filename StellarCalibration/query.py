@@ -4,7 +4,7 @@ from astropy.time import Time
 from astropy.coordinates import EarthLocation, AltAz, SkyCoord
 from astroquery.gaia import Gaia
 
-def query_catalog_altaz_from_meta(meta, radius_deg=60.0, gmax=2.5, top_m=None):
+def query_catalog_altaz_from_meta(meta, radiusDeg=60.0, gmax=2.5, top_m=None):
     lat_deg = float(meta["GPS"]["latitude"])
     lon_deg = float(meta["GPS"]["longitude"])
     alt_m = float(meta["GPS"]["altitude"])
@@ -29,7 +29,7 @@ def query_catalog_altaz_from_meta(meta, radius_deg=60.0, gmax=2.5, top_m=None):
     FROM gaiadr3.gaia_source
     WHERE 1=CONTAINS(
         POINT('ICRS', ra, dec),
-        CIRCLE('ICRS', {ra0}, {dec0}, {radius_deg})
+        CIRCLE('ICRS', {ra0}, {dec0}, {radiusDeg})
     )
     AND phot_g_mean_mag < {gmax}
     """

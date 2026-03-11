@@ -298,7 +298,7 @@ class StarCalibrationApp:
             bg_normal=SURFACE, bg_hover=BORDER,
             text="⬇  Save Shifted Image",
             font=FONT_SB, padx=16, pady=7,
-            command=self._save_shifted_image,
+            command=self._save_shiftedImage,
         )
         self.save_btn.pack(side="right")
 
@@ -377,7 +377,7 @@ class StarCalibrationApp:
         self.status_var.set("Calibration complete.")
 
         best          = result["best"]
-        center_result = result["center_result"]
+        centerResult = result["centerResult"]
 
         rms_text = (
             f"{best['rms_pix']:.2f} px"
@@ -386,12 +386,12 @@ class StarCalibrationApp:
         )
 
         zenith_text = (
-            f"x={center_result['zenith_x']:.1f}  "
-            f"y={center_result['zenith_y']:.1f} px"
+            f"x={centerResult['zenithX']:.1f}  "
+            f"y={centerResult['zenithY']:.1f} px"
         )
         shift_text = (
-            f"dx={center_result['shift_x']:+.1f}  "
-            f"dy={center_result['shift_y']:+.1f} px"
+            f"dx={centerResult['shiftX']:+.1f}  "
+            f"dy={centerResult['shiftY']:+.1f} px"
         )
 
         self.result_labels["score"].config(
@@ -411,26 +411,27 @@ class StarCalibrationApp:
         import numpy as np
         import matplotlib.pyplot as plt
         best          = result["best"]
-        center_result = result["center_result"]
+        centerResult = result["centerResult"]
+        centered_img = centerResult.get("centered_sub", centerResult.get("centeredSub"))
         img           = result["img"]
-        img_xy        = result["img_xy"]
-        img_mean      = float(np.mean(img))
-        img_std       = float(np.std(img))
+        imgXY        = result["imgXY"]
+        imgMean      = float(np.mean(img))
+        imgStd       = float(np.std(img))
 
         plt.figure()
         plt.imshow(img, origin="upper", cmap="gray",
-                   vmin=img_mean - 2 * img_std, vmax=img_mean + 5 * img_std)
-        plt.scatter(img_xy[:, 0], img_xy[:, 1],
+                   vmin=imgMean - 2 * imgStd, vmax=imgMean + 5 * imgStd)
+        plt.scatter(imgXY[:, 0], imgXY[:, 1],
                     s=50, edgecolor="red", facecolor="none", label="Image sources")
-        plt.scatter(best["pred_xy"][:, 0], best["pred_xy"][:, 1],
+        plt.scatter(best["predictedXY"][:, 0], best["predictedXY"][:, 1],
                     s=50, edgecolor="blue", facecolor="none", label="Predicted sources")
-        plt.scatter([center_result["target_cx"]], [center_result["target_cy"]],
+        plt.scatter([centerResult["targetCenterX"]], [centerResult["targetCenterY"]],
                     s=100, marker="+", c="yellow", label="Target center")
-        plt.scatter([center_result["zenith_x"]], [center_result["zenith_y"]],
+        plt.scatter([centerResult["zenithX"]], [centerResult["zenithY"]],
                     s=120, marker="x", c="cyan", label="Zenith")
         plt.plot(
-            [center_result["zenith_x"], center_result["target_cx"]],
-            [center_result["zenith_y"], center_result["target_cy"]],
+            [centerResult["zenithX"], centerResult["targetCenterX"]],
+            [centerResult["zenithY"], centerResult["targetCenterY"]],
             color="cyan", linestyle="--", linewidth=1.5, label="Applied shift",
         )
         plt.legend()
@@ -438,9 +439,9 @@ class StarCalibrationApp:
         plt.show(block=False)
 
         plt.figure()
-        plt.imshow(center_result["centered_sub"], origin="upper", cmap="gray",
-                   vmin=img_mean - 2 * img_std, vmax=img_mean + 5 * img_std)
-        plt.scatter([center_result["target_cx"]], [center_result["target_cy"]],
+        plt.imshow(centered_img, origin="upper", cmap="gray",
+                   vmin=imgMean - 2 * imgStd, vmax=imgMean + 5 * imgStd)
+        plt.scatter([centerResult["targetCenterX"]], [centerResult["targetCenterY"]],
                     s=120, marker="x", c="cyan", label="Centered zenith target")
         plt.legend()
         plt.title("Image shifted so zenith is centered")
@@ -460,11 +461,11 @@ class StarCalibrationApp:
         self.results_outer.pack_forget()
 
     def _open_preview(self, result: dict):
-        shifted_image  = result.get("shifted_image")
-        shifted_format = result.get("shifted_format", "PNG")
-        suggested_ext  = result.get("suggested_suffix", ".png")
+        shiftedImage = result.get("shiftedImage") or result.get("shifted_image")
+        shiftedFormat = result.get("shiftedFormat") or result.get("shifted_format")
+        suggested_ext = result.get("suggested_suffix", ".png")
 
-        if shifted_image is None:
+        if shiftedImage is None:
             messagebox.showinfo(
                 "No preview",
                 "Calibration finished but no shifted image was returned.",
@@ -481,13 +482,13 @@ class StarCalibrationApp:
         tk.Label(hdr, text="Calibrated Image Preview",
                  font=FONT_LG, bg=SURFACE, fg=FG).pack()
 
-        preview = _to_displayable(shifted_image.copy())
+        preview = _to_displayable(shiftedImage.copy())
         preview.thumbnail((1000, 700), Image.LANCZOS)
 
         photo     = ImageTk.PhotoImage(preview)
-        img_label = tk.Label(win, image=photo, bg=BG)
-        img_label.image = photo
-        img_label.pack(padx=16, pady=12)
+        imgLabel = tk.Label(win, image=photo, bg=BG)
+        imgLabel.image = photo
+        imgLabel.pack(padx=16, pady=12)
 
         btn_bar = tk.Frame(win, bg=BG)
         btn_bar.pack(pady=(0, 14))
@@ -506,7 +507,14 @@ class StarCalibrationApp:
             if not save_path:
                 return
             try:
-                shifted_image.save(save_path, format=shifted_format)
+                # Let PIL infer format from extension; fallback to provided format only if needed.
+                try:
+                    shiftedImage.save(save_path)
+                except Exception:
+                    if shiftedFormat:
+                        shiftedImage.save(save_path, format=shiftedFormat)
+                    else:
+                        raise
                 messagebox.showinfo("Saved", f"Shifted image saved to:\n{save_path}")
             except Exception as e:
                 messagebox.showerror("Save Failed", str(e))
@@ -524,7 +532,7 @@ class StarCalibrationApp:
             command=win.destroy,
         ).pack(side="left", padx=6)
 
-    def _save_shifted_image(self):
+    def _save_shiftedImage(self):
         if self._result is None:
             return
         self._open_preview(self._result)

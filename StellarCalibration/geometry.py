@@ -24,25 +24,25 @@ def orientation_matrix(alpha, beta, gamma):
     return R_tilt @ R_alpha
 
 
-def r_from_theta(theta_rad, R_pix):
-    return (theta_rad / (np.pi / 2)) * R_pix
+def r_from_theta(theta_rad, radiusPix):
+    return (theta_rad / (np.pi / 2)) * radiusPix
 
 
-def filter_image_sources_by_radius(img_xy, cx, cy, R_pix, radius_deg):
-    if len(img_xy) == 0:
-        return img_xy
+def filter_image_sources_by_radius(imgXY, cx, cy, radiusPix, radiusDeg):
+    if len(imgXY) == 0:
+        return imgXY
 
-    max_r_pix = (float(radius_deg) / 90.0) * float(R_pix)
-    dx = img_xy[:, 0] - float(cx)
-    dy = img_xy[:, 1] - float(cy)
+    maxRadiusPix = (float(radiusDeg) / 90.0) * float(radiusPix)
+    dx = imgXY[:, 0] - float(cx)
+    dy = imgXY[:, 1] - float(cy)
     rr = np.sqrt(dx * dx + dy * dy)
-    keep = rr <= max_r_pix
-    return img_xy[keep]
+    keep = rr <= maxRadiusPix
+    return imgXY[keep]
 
 
-def predict_pixels_from_catalog(alt_deg, az_deg, cx, cy, R_pix, alpha, beta, gamma):
-    alt = np.deg2rad(alt_deg)
-    az = np.deg2rad(az_deg)
+def predict_pixels_from_catalog(altDeg, azDeg, cx, cy, radiusPix, alpha, beta, gamma):
+    alt = np.deg2rad(altDeg)
+    az = np.deg2rad(azDeg)
 
     v_sky = unitvec_from_altaz(alt, az)
     R = orientation_matrix(alpha, beta, gamma)
@@ -52,7 +52,7 @@ def predict_pixels_from_catalog(alt_deg, az_deg, cx, cy, R_pix, alpha, beta, gam
     theta = np.arccos(z)
     phi = np.arctan2(v_cam[:, 1], v_cam[:, 0])
 
-    r = r_from_theta(theta, R_pix)
+    r = r_from_theta(theta, radiusPix)
     x = cx + r * np.cos(phi)
     y = cy + r * np.sin(phi)
     return np.stack([x, y], axis=-1)

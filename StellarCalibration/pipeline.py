@@ -1,44 +1,44 @@
 import numpy as np
 from GONet_Wizard.GONet_utils import GONetFile
-from detection import compact_search, measure_sources
+from detection import find_stars, find_centroids
 from query import query_catalog_altaz_from_meta
 from geometry import filter_image_sources_by_radius
 from solver import solve_orientation
 from centering import find_zenith_pixel_and_center, build_shifted_image
 
 
-def run_calibration(image_path, show_plots=False, N=5, gmax=2.5):
-    go = GONetFile.from_file(image_path)
+def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
+    go = GONetFile.from_file(imagePath)
     go.remove_overscan()
     img = go.green
 
-    img_mean = float(np.mean(img))
-    img_std = float(np.std(img))
-    mask = img > img_mean + N * img_std
+    imgMean = float(np.mean(img))
+    imgStd = float(np.std(img))
+    mask = img > imgMean + N * imgStd
 
-    labels, num_labels = compact_search(np.array(mask, dtype=bool))
-    _, x_centroids, y_centroids = measure_sources(img, labels, num_labels)
-    img_xy = np.column_stack([x_centroids, y_centroids])
+    labels, numLabels = find_stars(np.array(mask, dtype=bool))
+    xCentroids, yCentroids = find_centroids(img, labels, numLabels)
+    imgXY = np.column_stack([xCentroids, yCentroids])
 
     cx, cy = 1030, 760
-    R_pix = 740
-    catalog_radius_deg = 60.0
+    radiusPix = 740
+    catalogRadiusDeg = 60.0
 
-    img_xy = filter_image_sources_by_radius(
-        img_xy=img_xy, cx=cx, cy=cy, R_pix=R_pix, radius_deg=catalog_radius_deg,
+    imgXY = filter_image_sources_by_radius(
+        imgXY=imgXY, cx=cx, cy=cy, radiusPix=radiusPix, radiusDeg = catalogRadiusDeg,
     )
 
-    cat_alt_deg, cat_az_deg, _ = query_catalog_altaz_from_meta(
-        go.meta, radius_deg=catalog_radius_deg, gmax=gmax, top_m=None,
+    catalogAltDeg, catalogAzDeg, _ = query_catalog_altaz_from_meta(
+        go.meta, radiusDeg=catalogRadiusDeg, gmax=gmax, top_m=None,
     )
 
-    best = solve_orientation(img_xy, cat_alt_deg, cat_az_deg, cx, cy, R_pix)
+    best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix)
 
-    center_result = find_zenith_pixel_and_center(
-        img=img, best=best, cx=cx, cy=cy, R_pix=R_pix,
+    centerResult = find_zenith_pixel_and_center(
+        img=img, best=best, cx=cx, cy=cy, radiusPix=radiusPix,
     )
 
-    print(f"catalog_stars={len(cat_alt_deg)}, image_sources={len(img_xy)}")
+    print(f"catalog_stars={len(catalogAltDeg)}, image_sources={len(imgXY)}")
     print(f"score={best['score']}, matched={best['matched_count']}, rms_pix={best['rms_pix']:.3f}")
     print(
         "alpha_deg={:.3f}, beta_deg={:.3f}, gamma_deg={:.3f}".format(
@@ -47,26 +47,26 @@ def run_calibration(image_path, show_plots=False, N=5, gmax=2.5):
             np.rad2deg(best["gamma"]),
         )
     )
-    print(f"Zenith pixel: x={center_result['zenith_x']:.2f}, y={center_result['zenith_y']:.2f}")
-    print(f"Applied shift: dx={center_result['shift_x']:.2f}, dy={center_result['shift_y']:.2f}")
+    print(f"Zenith pixel: x={centerResult['zenithX']:.2f}, y={centerResult['zenithY']:.2f}")
+    print(f"Applied shift: dx={centerResult['shiftX']:.2f}, dy={centerResult['shiftY']:.2f}")
 
     if show_plots:
         import matplotlib.pyplot as plt
 
         fig1, ax1 = plt.subplots()
         ax1.imshow(img, origin="upper", cmap="gray",
-                   vmin=img_mean - 2 * img_std, vmax=img_mean + 5 * img_std)
-        ax1.scatter(img_xy[:, 0], img_xy[:, 1], s=50, edgecolor="red",
+                   vmin=imgMean - 2 * imgStd, vmax=imgMean + 5 * imgStd)
+        ax1.scatter(imgXY[:, 0], imgXY[:, 1], s=50, edgecolor="red",
                     facecolor="none", label="Detected sources")
-        ax1.scatter(best["pred_xy"][:, 0], best["pred_xy"][:, 1], s=50,
+        ax1.scatter(best["predictedXY"][:, 0], best["predictedXY"][:, 1], s=50,
                     edgecolor="blue", facecolor="none", label="Catalog predictions")
-        ax1.scatter([center_result["target_cx"]], [center_result["target_cy"]],
+        ax1.scatter([centerResult["targetCenterX"]], [centerResult["targetCenterY"]],
                     s=100, marker="+", c="yellow", label="Image centre")
-        ax1.scatter([center_result["zenith_x"]], [center_result["zenith_y"]],
+        ax1.scatter([centerResult["zenithX"]], [centerResult["zenithY"]],
                     s=120, marker="x", c="cyan", label="Zenith")
         ax1.plot(
-            [center_result["zenith_x"], center_result["target_cx"]],
-            [center_result["zenith_y"], center_result["target_cy"]],
+            [centerResult["zenithX"], centerResult["targetCenterX"]],
+            [centerResult["zenithY"], centerResult["targetCenterY"]],
             color="cyan", linestyle="--", linewidth=1.5, label="Applied shift",
         )
         ax1.legend()
@@ -74,28 +74,32 @@ def run_calibration(image_path, show_plots=False, N=5, gmax=2.5):
         plt.show()
 
         fig2, ax2 = plt.subplots()
-        ax2.imshow(center_result["centered_sub"], origin="upper", cmap="gray",
-                   vmin=img_mean - 2 * img_std, vmax=img_mean + 5 * img_std)
-        ax2.scatter([center_result["target_cx"]], [center_result["target_cy"]],
+        ax2.imshow(centerResult["centered_sub"], origin="upper", cmap="gray",
+                   vmin=imgMean - 2 * imgStd, vmax=imgMean + 5 * imgStd)
+        ax2.scatter([centerResult["targetCenterX"]], [centerResult["targetCenterY"]],
                     s=120, marker="x", c="cyan", label="Zenith (centred)")
         ax2.legend()
         ax2.set_title("Shifted image \u2014 zenith at centre")
         plt.show()
 
-    shifted_result = build_shifted_image(
-        image_path=image_path,
-        shift_x=center_result["shift_x"],
-        shift_y=center_result["shift_y"],
+    shiftedResult = build_shifted_image(
+        imagePath=imagePath,
+        shiftX=centerResult["shiftX"],
+        shiftY=centerResult["shiftY"],
     )
     print("Shifted image prepared (not yet saved).")
 
     return {
         "best": best,
-        "center_result": center_result,
+        "centerResult": centerResult,
         "img": img,
-        "img_xy": img_xy,
-        "shifted_image": shifted_result,
+        "imgXY": imgXY,
+        "shiftedImage": shiftedResult,
+        "shifted_image": shiftedResult,
+        "shiftedFormat": "PNG",
+        "shifted_format": "PNG",
+        "suggested_suffix": ".png",
     }
 
 if __name__ == "__main__":
-    run_calibration(r"c:\Users\spall\Documents\GitHub\StarCalibration\Testing Images\256_251029_204008_1761770474.jpg", show_plots=True, N=5, gmax=2.5)
+    run_calibration(r"C:\Users\spall\Desktop\GONet\StarCalibration\Testing Images\256_251029_204008_1761770474.jpg", show_plots=True, N=5, gmax=2.5)
