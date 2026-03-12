@@ -13,7 +13,8 @@ PROBELM: when we createa mask using a threshold based on the entire image,
     get drowned out and are not captured by the mask.
 
 SOLUTION: instead of creating a threshold based on the entire image, we can split the image into sections,
-    then we take the thresholds of those individual sections to build the mask. This eliminates the variance in overall brightness of different sections, 
+    then we take the thresholds of those individual sections to build the mask. 
+    This eliminates the variance in overall brightness of different sections, 
     and instead we are choosing stars based on contrast to their respective background.
 
 PSEUDO:
@@ -25,6 +26,10 @@ PSEUDO:
             add results into labels and numClusters
     
     return labels and numClusters
+
+TODO:
+    Somehow implement a way to filter stars by a min and max size. 
+    This will help get rid of outliers in noise and objects that are too big to be stars like clouds
 """
 def dynamic_find_stars(img, N = 5, sectionSize = 200):
     labels = np.zeros(img.shape[:2], dtype=int)
@@ -36,7 +41,13 @@ def dynamic_find_stars(img, N = 5, sectionSize = 200):
             sectionMean = np.mean(section)
             sectionStd = np.std(section)
             mask = section > sectionMean + N * sectionStd
-            #mask = binary_opening(mask) #This function is still unclear to me, I wont implement it yet, it seems to work fairly well for removing noise outliers
+            mask = binary_opening(mask) 
+            """
+            This function (binary_opening) is still unclear to me, it seems to work fairly well for removing noise outliers
+            The premise of the function is that it takes a mask and removes outliers like isolated true values
+            keeping only the large compact objects, With this said, I am unsure on the threshold it uses to do this
+            and whether it is the best solution for this project or not.
+            """
             sectionLabels, sectionNumClusters = cluster_stars(mask)
             if sectionNumClusters > 0:
                 labels[r:r+section.shape[0], c:c+section.shape[1]] = np.where(
@@ -50,14 +61,14 @@ def dynamic_find_stars(img, N = 5, sectionSize = 200):
 
 
 """
-find_stars takes a mask as input, uses nd_label to create stars labeled from 1 to N.
+cluster_stars takes a mask as input, uses nd_label to create stars labeled from 1 to N.
 returns labels which is a array of the connected values in the mask.
 returns numClusters, which is the number of clustered components created during the function.
 """
 
 def cluster_stars(mask):
     labels, numClusters = label(mask)
-    return labels, numClusters
+    return  labels, numClusters
 
 """
 find_centroids takes the image, and the output from find_stars (labels and numClusters) 
