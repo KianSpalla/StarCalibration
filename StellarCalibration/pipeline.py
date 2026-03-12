@@ -1,6 +1,6 @@
 import numpy as np
 from GONet_Wizard.GONet_utils import GONetFile
-from detection import find_stars, find_centroids
+from detection import dynamic_find_stars, find_centroids
 from query import query_catalog_altaz_from_meta
 from geometry import filter_image_sources_by_radius
 from solver import solve_orientation
@@ -12,11 +12,7 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     go.remove_overscan()
     img = go.green
 
-    imgMean = float(np.mean(img))
-    imgStd = float(np.std(img))
-    mask = img > imgMean + N * imgStd
-
-    labels, numLabels = find_stars(np.array(mask, dtype=bool))
+    labels, numLabels = dynamic_find_stars(img, N)
     xCentroids, yCentroids = find_centroids(img, labels, numLabels)
     imgXY = np.column_stack([xCentroids, yCentroids])
 
@@ -54,8 +50,7 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
         import matplotlib.pyplot as plt
 
         fig1, ax1 = plt.subplots()
-        ax1.imshow(img, origin="upper", cmap="gray",
-                   vmin=imgMean - 2 * imgStd, vmax=imgMean + 5 * imgStd)
+        ax1.imshow(img, origin="upper", cmap="gray")
         ax1.scatter(imgXY[:, 0], imgXY[:, 1], s=50, edgecolor="red",
                     facecolor="none", label="Detected sources")
         ax1.scatter(best["predictedXY"][:, 0], best["predictedXY"][:, 1], s=50,
@@ -74,8 +69,7 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
         plt.show()
 
         fig2, ax2 = plt.subplots()
-        ax2.imshow(centerResult["centered_sub"], origin="upper", cmap="gray",
-                   vmin=imgMean - 2 * imgStd, vmax=imgMean + 5 * imgStd)
+        ax2.imshow(centerResult["centeredSub"], origin="upper", cmap="gray")
         ax2.scatter([centerResult["targetCenterX"]], [centerResult["targetCenterY"]],
                     s=120, marker="x", c="cyan", label="Zenith (centred)")
         ax2.legend()

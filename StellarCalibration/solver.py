@@ -2,13 +2,22 @@ import numpy as np
 from scipy.spatial import cKDTree
 from geometry import predict_pixels_from_catalog
 
-
+"""
+match_score takes a cKDTree of the image sources, the predicted pixel positions from the catalog, and a pixel tolerance.
+It queries the tree to find the nearest image source for each predicted position and counts how many are within the pixel tolerance.
+Returns the total score (number of matches), the distances to the nearest image sources, and their indices.
+"""
 def match_score(imgTree, predictedXY, pixelTolerance=20.0):
-    dists, idx = imgTree.query(predictedXY, k=1)
-    score = np.sum(dists <= pixelTolerance)
-    return int(score), dists, idx
+    starDistance, starIndex = imgTree.query(predictedXY, k=1)
+    score = np.sum(starDistance <= pixelTolerance)
+    return int(score), starDistance, starIndex
 
-
+"""
+solve_orientation takes the detected image sources, the catalog altitudes and azimuths, the center coordinates, and the radius in pixels.
+It performs a search using alpha, beta, and gamma angles to find the best orientation that matches the detected sources to the catalog predictions.
+It first does a coarse search over a grid of angles, then refines the search around the best solution found. 
+It returns the best orientation parameters, the score, and the predicted pixel positions for the catalog stars.
+"""
 def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
     imgTree = cKDTree(imgXY)
 
@@ -23,15 +32,15 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
         for gamma in gammaList:
             for alpha in alphaGrid:
                 predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-                s, dists, idx = match_score(imgTree, predictedXY, pixelTolerance=25.0)
-                if s > best["score"]:
+                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=25.0)
+                if score > best["score"]:
                     best = {
-                        "score": s,
+                        "score": score,
                         "alpha": alpha,
                         "beta": beta,
                         "gamma": gamma,
-                        "dists": dists,
-                        "idx": idx,
+                        "starDistance": starDistance,
+                        "starIndex": starIndex,
                         "predictedXY": predictedXY,
                     }
 
@@ -48,23 +57,24 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
         for gamma in gammaList:
             for alpha in np.unique(alphaRefine):
                 predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-                s, dists, idx = match_score(imgTree, predictedXY, pixelTolerance=25.0)
-                if s > best["score"]:
+                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=25.0)
+                if score > best["score"]:
                     best = {
-                        "score": s,
+                        "score": score,
                         "alpha": alpha,
                         "beta": beta,
                         "gamma": gamma,
-                        "dists": dists,
-                        "idx": idx,
+                        "starDistance": starDistance,
+                        "starIndex": starIndex,
                         "predictedXY": predictedXY,
                     }
 
-    matchedMask = best["dists"] <= 25.0
+    matchedMask = best["starDistance"] <= 25.0
     matchedCount = int(np.sum(matchedMask))
     if matchedCount > 0:
-        best["rms_pix"] = float(np.sqrt(np.mean(best["dists"][matchedMask] ** 2)))
+        best["rms_pix"] = float(np.sqrt(np.mean(best["starDistance"][matchedMask] ** 2)))
     else:
         best["rms_pix"] = np.nan
     best["matched_count"] = matchedCount
+    
     return best
