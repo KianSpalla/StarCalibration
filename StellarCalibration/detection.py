@@ -1,8 +1,9 @@
 import numpy as np
 from scipy.ndimage import (
-    label as nd_label,
-    sum as nd_sum,
-    center_of_mass as nd_com,
+    label,
+    sum,
+    center_of_mass,
+    binary_opening
 )
 
 """
@@ -17,8 +18,6 @@ SOLUTION: instead of creating a threshold based on the entire image, we can spli
 
 PSEUDO:
     dynamic_find_stars(img):
-        create a mask variable we will add to
-
         Split image into sections
             per section:
             create mask for section
@@ -26,9 +25,6 @@ PSEUDO:
             add results into labels and numClusters
     
     return labels and numClusters
-
-img is a 2d array, we can split image into 120x120 pixel grids
-
 """
 def dynamic_find_stars(img, N = 5, sectionSize = 200):
     labels = np.zeros(img.shape[:2], dtype=int)
@@ -40,6 +36,7 @@ def dynamic_find_stars(img, N = 5, sectionSize = 200):
             sectionMean = np.mean(section)
             sectionStd = np.std(section)
             mask = section > sectionMean + N * sectionStd
+            #mask = binary_opening(mask) #This function is still unclear to me, I wont implement it yet, it seems to work fairly well for removing noise outliers
             sectionLabels, sectionNumClusters = cluster_stars(mask)
             if sectionNumClusters > 0:
                 labels[r:r+section.shape[0], c:c+section.shape[1]] = np.where(
@@ -59,7 +56,7 @@ returns numClusters, which is the number of clustered components created during 
 """
 
 def cluster_stars(mask):
-    labels, numClusters = nd_label(mask)
+    labels, numClusters = label(mask)
     return labels, numClusters
 
 """
@@ -69,11 +66,11 @@ and yCentroids that holds the y values of each clusters. The indicies of the two
 """
 def find_centroids(img, labels, numClusters):
     if numClusters == 0:
-        return [], [], []
+        return [], []
 
     labelIDs = np.arange(1, numClusters + 1)
-    totalFluxes = nd_sum(img, labels, index=labelIDs)
-    centers = nd_com(img, labels, index=labelIDs)
+    totalFluxes = sum(img, labels, index=labelIDs)
+    centers = center_of_mass(img, labels, index=labelIDs)
 
     xCentroids = []
     yCentroids = []
