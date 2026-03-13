@@ -1,6 +1,6 @@
 import numpy as np
 from GONet_Wizard.GONet_utils import GONetFile
-from detection import dynamic_find_stars, find_centroids
+from detection import dynamic_find_stars, find_centroids, filter_by_size
 from query import query_catalog_altaz_from_meta
 from geometry import filter_image_sources_by_radius
 from solver import solve_orientation
@@ -13,6 +13,7 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     img = go.green
 
     labels, numLabels = dynamic_find_stars(img, N)
+    labels, numLabels = filter_by_size(labels, numLabels)
     xCentroids, yCentroids = find_centroids(img, labels, numLabels)
     imgXY = np.column_stack([xCentroids, yCentroids])
 

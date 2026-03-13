@@ -40,10 +40,10 @@ def dynamic_find_stars(img, N = 5, sectionSize = 200):
     for r in range(0, img.shape[0], sectionSize):
         for c in range(0, img.shape[1], sectionSize):
             section = img[r:r+sectionSize, c:c+sectionSize]
-            sectionMean = np.mean(section)
-            sectionStd = np.std(section)
-            mask = section > sectionMean + N * sectionStd
-            mask = binary_opening(mask) 
+            sectionMed = np.median(section)
+            sectionNMAD = 1.4826 * np.median(np.abs(section - sectionMed))
+            mask = section > sectionMed + N * sectionNMAD
+            #mask = binary_opening(mask) 
             """
             This function (binary_opening) is still unclear to me, it seems to work fairly well for removing noise outliers
             The premise of the function is that it takes a mask and removes outliers like isolated true values
@@ -71,6 +71,28 @@ def cluster_stars(mask):
     return  labels, numClusters
 
 """
+filter_by_size removes blobs from labels that are smaller than minPixels or larger than maxPixels.
+minPixels filters out hot pixels and noise; maxPixels filters out clouds and other large non-stellar objects.
+Returns updated labels and numClusters with the surviving blobs relabeled from 1 to N.
+"""
+def filter_by_size(labels, numClusters, minPixels=4, maxPixels=200):
+    if numClusters == 0:
+        return labels, numClusters
+
+    labelIDs = np.arange(1, numClusters + 1)
+    ones = np.ones_like(labels, dtype=float)
+    pixelCounts = sum(ones, labels, index=labelIDs)
+
+    filtered = np.zeros_like(labels)
+    newID = 0
+    for i, lid in enumerate(labelIDs):
+        if minPixels <= int(pixelCounts[i]) <= maxPixels:
+            newID += 1
+            filtered[labels == lid] = newID
+
+    return filtered, newID
+
+"""
 find_centroids takes the image, and the output from find_stars (labels and numClusters) 
 and creates weighted centroids on each star cluster. Returns xCentroids which is an array that holds the x values of each cluster,
 and yCentroids that holds the y values of each clusters. The indicies of the two arrays coorelate with one another.
@@ -79,9 +101,13 @@ def find_centroids(img, labels, numClusters):
     if numClusters == 0:
         return [], []
 
+    background = np.median(img)
+
+    img_sub = img.astype(float) - background
+
     labelIDs = np.arange(1, numClusters + 1)
-    totalFluxes = sum(img, labels, index=labelIDs)
-    centers = center_of_mass(img, labels, index=labelIDs)
+    totalFluxes = sum(img_sub, labels, index=labelIDs)
+    centers = center_of_mass(img_sub, labels, index=labelIDs)
 
     xCentroids = []
     yCentroids = []
