@@ -17,6 +17,8 @@ solve_orientation takes the detected image sources, the catalog altitudes and az
 It performs a search using alpha, beta, and gamma angles to find the best orientation that matches the detected sources to the catalog predictions.
 It first does a coarse search over a grid of angles, then refines the search around the best solution found. 
 It returns the best orientation parameters, the score, and the predicted pixel positions for the catalog stars.
+
+NOTE: A more in depth explanation of the alpha, beta, and gamma angles can be found in comments at the bottom of this file.
 """
 def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
     imgTree = cKDTree(imgXY)
@@ -78,3 +80,38 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
     best["matched_count"] = matchedCount
     
     return best
+
+
+"""
+To understand the Alpha, Beta, and Gamma values, it is important to fully understand the problem we are facing. 
+This problem is the incorrect placement of GONet Cameras. There are two conditions for a GONet to be considered "Calibrated"
+    1. The GONet camera must be facing directly north
+    2. The GONet camera must be perfectly level
+
+Alpha, Beta, and Gamma tie directly to these two issues.
+    Rule 1 is solved through Alpha
+    Rule 2 is solved by Beta and Gamma in unison
+
+As there are two rules for a GONet being calibrated, every solution involves two steps
+    1. Rotating the camera so that North is centered at the top (Alpha)
+    2. Tilting the camera so that the zenith is at the center of the image (Beta + Gamma)
+
+Alpha is independent of Beta + Gamma
+-Alpha
+    Alpha is the rotation about the optical axis. In the sense of correcting GONet orientation, 
+    this would be pointing the arrows on a GONet so that they are directly north
+
+Beta + Gamma are tied together
+-Beta
+    Beta is the tilt away from level. In the sense of correcting GONet orientation, 
+    this would be how much the camera is tipped.
+-Gamma
+    Gamma is the direction of the tilt. In the sense of correcting GONet orientation, 
+    this would be which cardinal direction (North, East, West, South, or anything in between) the tilt points towards
+
+This is why when beta is 0, gamma is irrelevant, as if there is no tilt away from level,
+it doesn't matter which direction the nonexistent tilt points towards
+
+When we are solving for this problem in the solve_orientation function, we are searching over these Alpha, Beta, and Gamma values
+and looking for the combination of these three values that gives us the most amount of matches.
+"""
