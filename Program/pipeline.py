@@ -81,6 +81,7 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
         imagePath=imagePath,
         shiftX=centerResult["shiftX"],
         shiftY=centerResult["shiftY"],
+        alphaDeg=centerResult["alphaDeg"],
     )
     print("Shifted image prepared (not yet saved).")
 

@@ -75,7 +75,7 @@ filter_by_size removes blobs from labels that are smaller than minPixels or larg
 minPixels filters out hot pixels and noise; maxPixels filters out clouds and other large non-stellar objects.
 Returns updated labels and numClusters with the surviving blobs relabeled from 1 to N.
 """
-def filter_by_size(labels, numClusters, minPixels=4, maxPixels=200):
+def filter_by_size(labels, numClusters, minPixels=6, maxPixels=200):
     if numClusters == 0:
         return labels, numClusters
 
